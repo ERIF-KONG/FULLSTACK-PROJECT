@@ -1,0 +1,201 @@
+FULLSTACK PROJECT NO:1
+
+
+BACKEND: Django
+
+pip install django mysqlclient
+django-admin startproject taskmanager
+cd taskmanager
+django-admin startapp tasks
+
+DATABASE:
+CREATE DATABASE taskmanager;
+CREATE USER 'taskuser'@'localhost' IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON taskmanager.* TO 'taskuser'@'localhost';
+FLUSH PRIVILEGES;
+
+
+-settings.py
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'taskmanager',
+        'USER': 'yourusername',
+        'PASSWORD': 'yourpassword',
+        'HOST': 'localhost',
+        'PORT': '3306',
+    }
+}
+
+-tasks.py
+from django.db import models
+
+class Task(models.Model):
+    title = models.CharField(max_length=100)
+    description = models.TextField()
+    completed = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.title
+
+-admin.py
+from django.contrib import admin
+from .models import Task
+
+admin.site.register(Task)
+python manage.py makemigrations
+python manage.py migrate
+
+serializers.py
+from rest_framework import serializers
+from .models import Task
+
+class TaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Task
+        fields = '__all__'
+
+-views.py
+from rest_framework import viewsets
+from .models import Task
+from .serializers import TaskSerializer
+
+class TaskViewSet(viewsets.ModelViewSet):
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+
+
+-urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import TaskViewSet
+
+router = DefaultRouter()
+router.register(r'tasks', TaskViewSet)
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+
+
+pip install djangorestframework
+
+
+-settings.py
+INSTALLED_APPS = [
+    ...
+    'rest_framework',
+    'tasks',
+]
+
+
+FRONTEND:
+-
+npx create-react-app taskmanager-frontend
+cd taskmanager-frontend
+npm install axios
+
+-create task list component
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const TaskList = () => {
+    const [tasks, setTasks] = useState([]);
+
+    useEffect(() => {
+        axios.get('http://localhost:8000/api/tasks/')
+            .then(res => {
+                setTasks(res.data);
+            })
+            .catch(err => {
+                console.error(err);
+            });
+    }, []);
+
+    return (
+        <div>
+            <h1>Task List</h1>
+            <ul>
+                {tasks.map(task => (
+                    <li key={task.id}>{task.title} - {task.description}</li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+export default TaskList;
+
+
+-create taskform
+import React, { useState } from 'react';
+import axios from 'axios';
+
+const TaskForm = ({ task, setTask, fetchTasks }) => {
+    const [title, setTitle] = useState(task ? task.title : '');
+    const [description, setDescription] = useState(task ? task.description : '');
+    const [completed, setCompleted] = useState(task ? task.completed : false);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const taskData = { title, description, completed };
+
+        if (task) {
+            axios.put(`http://localhost:8000/api/tasks/${task.id}/`, taskData)
+                .then(res => {
+                    fetchTasks();
+                    setTask(null);
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        } else {
+            axios.post('http://localhost:8000/api/tasks/', taskData)
+                .then(res => {
+                    fetchTasks();
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <div>
+                <label>Title:</label>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div>
+                <label>Description:</label>
+                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div>
+                <label>Completed:</label>
+                <input type="checkbox" checked={completed} onChange={(e) => setCompleted(e.target.checked)} />
+            </div>
+            <button type="submit">{task ? 'Update Task' : 'Create Task'}</button>
+        </form>
+    );
+};
+
+export default TaskForm;
+
+
+-app.js
+import React from 'react';
+import Task from './components/Task';
+
+const App = () => {
+    return (
+        <div className="App">
+            <Task />
+        </div>
+    );
+};
+
+export default App;
+
+
+run the application
+npm start
